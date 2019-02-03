@@ -210,6 +210,21 @@ Func _ConfluenceUpdatePage($space_key, $ancestor_key, $page_key, $title, $body)
 	ConsoleWrite('@@ Debug(' & @ScriptLineNumber & ') : $confluence_json = ' & $confluence_json & @CRLF & '>Error code: ' & @error & @CRLF) ;### Debug Console
 EndFunc
 
+Func _ConfluenceWikiToHtml($wiki_markup)
+
+	FileDelete(@ScriptDir & "\curl_in.json")
+	FileWrite(@ScriptDir & "\curl_in.json", $wiki_markup)
+
+	$curl = 'curl.exe -k -H "Accept: application/json" -H "Content-Type: application/json" -X POST --data @curl_in.json -u ' & $confluence_username & ':' & $confluence_password & ' ' & $confluence_domain & '/rest/tinymce/1/wikixhtmlconverter'
+	ConsoleWrite('@@ Debug(' & @ScriptLineNumber & ') : $curl = ' & $curl & @CRLF & '>Error code: ' & @error & @CRLF) ;### Debug Console
+
+	Local $iPID = Run('curl.exe -k -H "Accept: application/json" -H "Content-Type: application/json" -X POST --data @curl_in.json -u ' & $confluence_username & ':' & $confluence_password & ' ' & $confluence_domain & '/rest/tinymce/1/wikixhtmlconverter', @ScriptDir, @SW_HIDE, $STDOUT_CHILD)
+    ProcessWaitClose($iPID)
+    local $confluence_html = StdoutRead($iPID)
+	ConsoleWrite('@@ Debug(' & @ScriptLineNumber & ') : $confluence_html = ' & $confluence_html & @CRLF & '>Error code: ' & @error & @CRLF) ;### Debug Console
+	return $confluence_html
+EndFunc
+
 #cs
 Func _JiraGetSearchResultKeysAndIssueTypeNames($fields, $jql)
 

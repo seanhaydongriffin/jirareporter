@@ -24,6 +24,7 @@ Global $jira_username = ""
 Global $jira_password = ""
 Global $jira_json = ""
 Global $jira_html = ""
+Global $app_name = "Data Extractor"
 #EndRegion Global Variables and Constants
 #Region Core functions
 ; #FUNCTION# ;===============================================================================
@@ -166,24 +167,45 @@ EndFunc
 
 ; Search
 
-Func _JiraSearchIssues($fields, $jql)
+Func _JiraSearchIssues($fields, $jql, $changelog = False)
 
 	Local $startAt = 1
 	Local $response = ""
 	$jira_json = ""
+	Local $changelog_json = ""
+
+	if $changelog = True Then
+
+		$changelog_json = "expand=changelog&"
+	EndIf
+
 	Local $jql_encoded = EncodeUrl($jql)
 
 	Do
 
-;		MsgBox(0,"",$startAt)
+	;	MsgBox(0,"",$startAt)
+		ControlSetText($app_name, "", "Static1",  "_JiraSearchIssues startAt=" & $startAt & "&jql=" & $jql_encoded)
 
-	;	$response = cURL_easy($jira_domain & "/rest/api/2/search?fields=" & $fields & "&jql=" & $jql_encoded, "", 0, 0, "", "Content-Type: application/json", "", 0, 1, 0, $jira_username & ":" & $jira_password)
-		$response = cURL_easy($jira_domain & "/rest/api/2/search?fields=" & $fields & "&maxResults=100&startAt=" & $startAt & "&jql=" & $jql_encoded, "", 0, 0, "", "Content-Type: application/json", "", 0, 1, 0, $jira_username & ":" & $jira_password)
-	;	$response = cURL_easy($jira_domain & "/rest/api/2/search?jql=" & $jql_encoded, "", 0, 0, "", "Content-Type: application/json", "", 0, 1, 0, $jira_username & ":" & $jira_password)
+
+;		$response = cURL_easy($jira_domain & "/rest/api/2/search?" & $changelog_json & "fields=" & $fields & "&maxResults=100&startAt=" & $startAt & "&jql=" & $jql_encoded, "", 0, 0, "", "Content-Type: application/json", "", 0, 1, 0, $jira_username & ":" & $jira_password)
+
+
+
+		Local $iPID = Run('curl.exe -k -H "Accept: application/json" -H "Content-Type: application/json" -u ' & $jira_username & ':' & $jira_password & ' ' & $jira_domain & "/rest/api/2/search?" & $changelog_json & "fields=" & $fields & "&maxResults=100&startAt=" & $startAt & "&jql=" & $jql_encoded, @ScriptDir, @SW_HIDE, $STDOUT_CHILD)
+		ProcessWaitClose($iPID)
+		$response = StdoutRead($iPID)
+
 
 ;	msgbox(0,"cc",$response[2])
 
-		if StringInStr($response[2], """issues"":[]") > 0 Then
+;		FileDelete("D:\dwn\fred2.txt")
+;		FileWrite("D:\dwn\fred2.txt", $jira_domain & "/rest/api/2/search?" & $changelog_json & "fields=" & $fields & "&maxResults=100&startAt=" & $startAt & "&jql=" & $jql_encoded)
+;		FileDelete("D:\dwn\fred3.txt")
+;		FileWrite("D:\dwn\fred3.txt", $response)
+
+
+;		if StringInStr($response[2], """issues"":[]") > 0 Then
+		if StringInStr($response, """issues"":[]") > 0 Then
 
 			ExitLoop
 		EndIf
@@ -191,19 +213,16 @@ Func _JiraSearchIssues($fields, $jql)
 		if StringLen($jira_json) > 0 Then
 
 			$jira_json = StringLeft($jira_json, StringLen($jira_json) - 2)
-			$response[2] = "," & StringMid($response[2], StringInStr($response[2], "[") + 1)
+;			$response[2] = "," & StringMid($response[2], StringInStr($response[2], "[") + 1)
+			$response = "," & StringMid($response, StringInStr($response, "[") + 1)
 		EndIf
 
-		$jira_json = $jira_json & $response[2]
+;		$jira_json = $jira_json & $response[2]
+		$jira_json = $jira_json & $response
 		$startAt = $startAt + 100
 
-	Until False ;StringInStr($response[2], """issues"":[]") > 0
+	Until False
 
-;	FileDelete("D:\dwn\fred.txt")
-;	FileWrite("D:\dwn\fred.txt", $jira_json)
-;	Exit
-
-;	Return $jira_json
 
 EndFunc
 
@@ -267,8 +286,8 @@ Func _JiraGetSearchResultBugs($fields, $jql)
 
 	_JiraSearchIssues($fields, $jql)
 
-;	FileDelete("D:\dwn\fred.txt")
-;	FileWrite("D:\dwn\fred.txt", $jira_json)
+	FileDelete("D:\dwn\fred.txt")
+	FileWrite("D:\dwn\fred.txt", $jira_json)
 ;Exit
 
 	; "key":"SEAB-4681","fields":{"summary":"1.13 - Regression Requirements - upload organisation units to the tenant","issuetype":
@@ -281,15 +300,90 @@ Func _JiraGetSearchResultBugs($fields, $jql)
 ;	$rr = StringRegExp($jira_json, '(?U)"key":".*","f', 3)
 ;	$rr = StringRegExp($jira_json, '(?U)\{"expand":".*","id":".*","self":".*","key":"(.*)".*"summary":"(.*)",.*"reporter":".*".*"displayName":"(.*)"', 3)
 ;	$rr = StringRegExp($jira_json, '(?U)\{"expand":".*","id":".*","self":".*","key":"(.*)".*"summary":"(.*)",.*"versions":(.*),.*"customfield_12000".*"value":"(.*)".*"reporter".*"displayName":"(.*)".*,"fixVersions":(.*),.*"priority":.*"name":"(.*)",.*"resolution":(.*),"labels":(.*)\}', 3)
-	$rr = StringRegExp($jira_json, '(?U)"operations,versionedRepresentations,editmeta,changelog,renderedFields","id":".*","self":".*","key":"(.*)".*"summary":"(.*)","customfield_10007":(.*),"environment":"(.*)","versions":(.*),.*"customfield_12000".*"value":"(.*)".*"reporter".*"displayName":"(.*)".*,"fixVersions":(.*),.*"priority":.*"name":"(.*)",.*"resolution":(.*)\{"expand":', 3)
-	; ,"labels":(.*)\}
-;;	$rr = StringRegExp($jira_json, '(?U)\{"expand":(.*)', 3)
-;	$rr = StringSplit($jira_json, '{"expand":', 3)
-	_ArrayDisplay($rr)
-	Exit
+;	$rr = StringRegExp($jira_json, '(?U)"operations,versionedRepresentations,editmeta,changelog,renderedFields","id":".*","self":".*","key":"(.*)".*"summary":"(.*)","customfield_10007":(.*),"environment":"(.*)","versions":(.*),.*"customfield_12000".*"value":"(.*)".*"reporter".*"displayName":"(.*)".*,"fixVersions":(.*),.*"priority":.*"name":"(.*)",.*"resolution":(.*)\{"expand":', 3)
+;	_ArrayDisplay($rr)
+;	Exit
 
+
+;	Return $rr
+
+EndFunc
+
+Func _JiraGetSearchResultBugStatusHistory($fields, $jql)
+
+	_JiraSearchIssues($fields, $jql, True)
+
+	FileDelete("D:\dwn\fred.txt")
+	FileWrite("D:\dwn\fred.txt", $jira_json)
+;Exit
+
+	ControlSetText($app_name, "", "Static1",  "Decoding json ...")
+
+
+	local $rr[0]
+	Local $decoded_json = Json_Decode($jira_json)
+
+	for $i = 0 to 99999
+
+		Local $key = Json_Get($decoded_json, '.issues[' & $i & '].key')
+;MsgBox(0,"a",$key)
+
+		if @error > 0 or StringLen($key) = 0 Then ExitLoop
+
+		ControlSetText($app_name, "", "Static1",  "Bug #" & $i & " key " & $key)
+
+		Local $affected_version = Json_Get($decoded_json, '.issues[' & $i & '].fields.versions[0].name')
+		Local $priority = Json_Get($decoded_json, '.issues[' & $i & '].fields.priority.name')
+
+		Local $history = ""
+
+		for $j = 0 to 99999
+
+			$created = Json_Get($decoded_json, '.issues[' & $i & '].changelog.histories[' & $j & '].created')
+;MsgBox(0,"b",$created)
+
+			if @error > 0 or StringLen($created) = 0 Then ExitLoop
+
+			for $k = 0 to 99999
+
+				Local $field = Json_Get($decoded_json, '.issues[' & $i & '].changelog.histories[' & $j & '].items[' & $k & '].field')
+
+				if @error > 0 or StringLen($field) = 0 Then ExitLoop
+
+				if StringCompare($field, "status") = 0 Then
+
+					Local $from = Json_Get($decoded_json, '.issues[' & $i & '].changelog.histories[' & $j & '].items[' & $k & '].fromString')
+					Local $to = Json_Get($decoded_json, '.issues[' & $i & '].changelog.histories[' & $j & '].items[' & $k & '].toString')
+
+					if StringLen($history) > 0 Then
+
+						$history = $history & "|"
+					EndIf
+
+					$history = $history & $created & "," & $from & "," & $to
+				EndIf
+			Next
+		Next
+
+		if StringLen($history) > 0 Then
+
+			$history = $history & "|"
+		EndIf
+
+		Local $created = Json_Get($decoded_json, '.issues[' & $i & '].fields.created')
+		$history = $history & $created & ",,Open"
+
+		_ArrayAdd($rr, $key, 0, "|", @CRLF, 1)
+		_ArrayAdd($rr, $affected_version, 0, "|", @CRLF, 1)
+		_ArrayAdd($rr, $priority, 0, "|", @CRLF, 1)
+		_ArrayAdd($rr, $history, 0, "|", @CRLF, 1)
+	Next
+
+;	_ArrayDisplay($rr)
+;	Exit
 
 	Return $rr
+
 
 EndFunc
 
@@ -419,6 +513,41 @@ Func _JiraBrowseIssue($key)
 	$jira_html = $response[2]
 EndFunc
 
+
+Func _JiraGetVersions($project_key)
+
+	$response = cURL_easy($jira_domain & "/rest/api/2/project/" & $project_key & "/versions", "", 0, 0, "", "Content-Type: application/json", "", 0, 1, 0, $jira_username & ":" & $jira_password)
+	$jira_json = $response[2]
+	$jira_json = '{"versions":' & $jira_json & '}'
+EndFunc
+
+
+
+Func _JiraGetVersionNames($project_key)
+
+
+	_JiraGetVersions($project_key)
+
+;	FileDelete("D:\dwn\fred.txt")
+;	FileWrite("D:\dwn\fred.txt", $jira_json)
+;Exit
+
+	local $rr[0]
+	Local $decoded_json = Json_Decode($jira_json)
+
+
+	for $i = 0 to 99999
+
+		Local $name = Json_Get($decoded_json, '.versions[' & $i & '].name')
+
+		if @error > 0 Then ExitLoop
+
+		_ArrayAdd($rr, $name, 0, "|", @CRLF, 1)
+	Next
+
+	Return $rr
+
+EndFunc
 
 
 Func _JiraGetTestRailTestCasesFromIssue($key)
